@@ -254,6 +254,35 @@
       margin-bottom: 20px;
     }
 
+    .player-status {
+      margin: 0 0 18px;
+      padding: 12px 14px;
+      border-radius: 14px;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.08);
+      color: #dbe4f0;
+      font-size: 0.95rem;
+      font-weight: 500;
+    }
+
+    .player-status.playing {
+      color: #8df0b8;
+      border-color: rgba(34, 197, 94, 0.28);
+      background: rgba(34, 197, 94, 0.08);
+    }
+
+    .player-status.loading {
+      color: #ffd7a8;
+      border-color: rgba(255, 122, 24, 0.28);
+      background: rgba(255, 122, 24, 0.08);
+    }
+
+    .player-status.error {
+      color: #ffb4c0;
+      border-color: rgba(255, 59, 95, 0.28);
+      background: rgba(255, 59, 95, 0.08);
+    }
+
     .player-controls {
       display: flex;
       gap: 12px;
@@ -543,14 +572,19 @@
         <div class="live-pill">🔴 Transmissão ao vivo</div>
 
         <div class="player-box">
-          <h3>Vini Radio FM</h3>
+          <h3>DO POVO NEWS / Rádio Play Regional</h3>
           <p>Ouça agora nossa programação ao vivo com um player moderno e responsivo.</p>
 
-          <audio id="audio" src="https://server28.srvsh.com.br:9046/;"></audio>
+          <audio id="audio" preload="none">
+            <source src="https://stm28.xcast.com.br:9370/stream" type="audio/mpeg" />
+            Seu navegador não suporta áudio ao vivo.
+          </audio>
+
+          <div class="player-status" id="playerStatus">Pronto para ouvir</div>
 
           <div class="player-controls">
-            <button class="player-btn play" onclick="playRadio()">▶ Dar play</button>
-            <button class="player-btn pause" onclick="pauseRadio()">⏸ Pausar</button>
+            <button class="player-btn play" id="togglePlayBtn" type="button">▶ Dar play</button>
+            <button class="player-btn pause" id="muteBtn" type="button">🔇 Mutar</button>
           </div>
 
           <div class="volume-wrap">
@@ -662,19 +696,83 @@
   <script>
     const audio = document.getElementById("audio");
     const volume = document.getElementById("volume");
+    const togglePlayBtn = document.getElementById("togglePlayBtn");
+    const muteBtn = document.getElementById("muteBtn");
+    const playerStatus = document.getElementById("playerStatus");
 
-    function playRadio() {
-      audio.play().catch((error) => {
-        console.log("Não foi possível iniciar o áudio automaticamente:", error);
-      });
+    let isPlaying = false;
+
+    audio.volume = Number(volume.value);
+
+    function setStatus(text, type = "") {
+      playerStatus.textContent = text;
+      playerStatus.className = "player-status";
+      if (type) {
+        playerStatus.classList.add(type);
+      }
     }
 
-    function pauseRadio() {
-      audio.pause();
+    async function togglePlay() {
+      if (!isPlaying) {
+        try {
+          setStatus("Conectando à transmissão ao vivo...", "loading");
+          await audio.play();
+        } catch (error) {
+          console.error("Erro ao iniciar a rádio:", error);
+          setStatus("Não foi possível iniciar a transmissão. Tente novamente.", "error");
+        }
+      } else {
+        audio.pause();
+      }
     }
+
+    function toggleMute() {
+      audio.muted = !audio.muted;
+      muteBtn.textContent = audio.muted ? "🔊 Ativar som" : "🔇 Mutar";
+    }
+
+    togglePlayBtn.addEventListener("click", togglePlay);
+    muteBtn.addEventListener("click", toggleMute);
 
     volume.addEventListener("input", () => {
-      audio.volume = volume.value;
+      audio.volume = Number(volume.value);
+
+      if (audio.volume > 0 && audio.muted) {
+        audio.muted = false;
+        muteBtn.textContent = "🔇 Mutar";
+      }
+    });
+
+    audio.addEventListener("playing", () => {
+      isPlaying = true;
+      togglePlayBtn.textContent = "⏸ Pausar";
+      togglePlayBtn.classList.remove("play");
+      togglePlayBtn.classList.add("pause");
+      setStatus("🔴 No ar agora", "playing");
+    });
+
+    audio.addEventListener("pause", () => {
+      isPlaying = false;
+      togglePlayBtn.textContent = "▶ Dar play";
+      togglePlayBtn.classList.remove("pause");
+      togglePlayBtn.classList.add("play");
+      setStatus("Transmissão pausada");
+    });
+
+    audio.addEventListener("waiting", () => {
+      setStatus("Carregando transmissão...", "loading");
+    });
+
+    audio.addEventListener("loadstart", () => {
+      setStatus("Preparando player...", "loading");
+    });
+
+    audio.addEventListener("error", () => {
+      isPlaying = false;
+      togglePlayBtn.textContent = "▶ Tentar novamente";
+      togglePlayBtn.classList.remove("pause");
+      togglePlayBtn.classList.add("play");
+      setStatus("Erro ao conectar com a rádio ao vivo.", "error");
     });
   </script>
 </body>
